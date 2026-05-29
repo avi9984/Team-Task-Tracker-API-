@@ -1,0 +1,26 @@
+{
+  "name": "team-task-tracker",
+  "version": "1.0.0",
+  "description": "\"Assignment of the team task tracker api\"",
+  "license": "ISC",
+  "author": "Avinash",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "node verify.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "ioredis": "^5.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.6.3",
+    "morgan": "^1.10.1",
+    "nodemon": "^3.1.14"
+  }
+}
