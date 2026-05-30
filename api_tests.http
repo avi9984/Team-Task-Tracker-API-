@@ -1,0 +1,297 @@
+# Team Task Tracker API - Test Suite
+#
+# This file is compatible with the VS Code REST Client extension.
+# Install the "REST Client" extension in VS Code to send requests directly from here.
+#
+# Variables are defined below. If you run the "Login" request, the REST Client will automatically
+# capture the accessToken and refreshToken for subsequent requests.
+
+@baseUrl = http://localhost:5000/api
+
+# ==========================================
+# 1. AUTHENTICATION & REGISTRATION
+# ==========================================
+
+### Register Admin & Create New Organization
+# @name registerAdmin
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Admin User",
+  "email": "admin@example.com",
+  "password": "password123",
+  "role": "ADMIN",
+  "organizationName": "Acme Corp"
+}
+
+### Login as Admin (Run this first to set auth tokens)
+# @name loginAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+### Capture tokens and organization details from Login response
+@adminToken = {{loginAdmin.response.body.data.tokens.accessToken}}
+@adminRefreshToken = {{loginAdmin.response.body.data.tokens.refreshToken}}
+@organizationId = {{loginAdmin.response.body.data.user.organization.id}}
+
+### Register a User in an Existing Organization
+# @name registerMember
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "John Member",
+  "email": "john@example.com",
+  "password": "password123",
+  "role": "MEMBER",
+  "organizationId": "{{organizationId}}"
+}
+
+### Refresh Access Token (using captured refresh token)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
+}
+
+
+# ==========================================
+# 2. USER MANAGEMENT (ADMIN ONLY)
+# ==========================================
+
+### Create a Manager (using Admin Token)
+# @name createManager
+POST {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Alice Manager",
+  "email": "alice@example.com",
+  "password": "password123",
+  "role": "MANAGER"
+}
+
+### Capture Manager ID
+@managerId = {{createManager.response.body.data.id}}
+
+### Create a Member (using Admin Token)
+# @name createMember
+POST {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Bob Member",
+  "email": "bob@example.com",
+  "password": "password123",
+  "role": "MEMBER"
+}
+
+### Capture Member ID
+@memberId = {{createMember.response.body.data.id}}
+
+### Get All Users in Organization (Admin Token)
+GET {{baseUrl}}/users
+Authorization: Bearer {{adminToken}}
+
+### Get User by ID (Admin Token)
+GET {{baseUrl}}/users/{{memberId}}
+Authorization: Bearer {{adminToken}}
+
+### Update User (Admin Token)
+PATCH {{baseUrl}}/users/{{memberId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Bob Member Updated",
+  "role": "MEMBER"
+}
+
+### Delete User (Admin Token)
+# Note: You cannot delete your own account (e.g. current admin)
+DELETE {{baseUrl}}/users/{{memberId}}
+Authorization: Bearer {{adminToken}}
+
+
+# ==========================================
+# 3. PROJECT MANAGEMENT (ADMIN/MANAGER write, all read)
+# ==========================================
+
+### Login as Manager (for project & task operations)
+# @name loginManager
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "password123"
+}
+
+### Capture Manager Token
+@managerToken = {{loginManager.response.body.data.tokens.accessToken}}
+
+### Create a Project (Manager Token)
+# @name createProject
+POST {{baseUrl}}/projects
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "name": "Project Alpha",
+  "description": "Development of the team task tracker UI"
+}
+
+### Capture Project ID
+@projectId = {{createProject.response.body.data._id}}
+
+### Get All Projects (Manager/Member Token)
+GET {{baseUrl}}/projects
+Authorization: Bearer {{managerToken}}
+
+### Get Project by ID (Manager/Member Token)
+GET {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{managerToken}}
+
+### Update Project (Manager Token)
+PATCH {{baseUrl}}/projects/{{projectId}}
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "name": "Project Alpha Redux",
+  "description": "Development of the team task tracker UI and backend integration"
+}
+
+### Delete Project (Manager Token - UNCOMMENT TO TEST)
+# DELETE {{baseUrl}}/projects/{{projectId}}
+# Authorization: Bearer {{managerToken}}
+
+
+# ==========================================
+# 4. TASK MANAGEMENT (ADMIN/MANAGER write, all read)
+# ==========================================
+
+### Create Task (Manager Token)
+# @name createTask
+POST {{baseUrl}}/tasks
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "title": "Setup Express Server",
+  "description": "Initialize express server with middleware, CORS, Helmet, and routing.",
+  "priority": "HIGH",
+  "due_date": "2026-06-15T18:00:00.000Z",
+  "assignee": "{{memberId}}",
+  "projectId": "{{projectId}}"
+}
+
+### Capture Task ID
+@taskId = {{createTask.response.body.data._id}}
+
+### List Tasks (Manager Token - lists all in org)
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{managerToken}}
+
+### List Tasks with Filters (Manager Token - test pagination and Redis caching)
+GET {{baseUrl}}/tasks?status=TODO&priority=HIGH&assignee={{memberId}}&page=1&limit=5
+Authorization: Bearer {{managerToken}}
+
+### Login as Member (Bob Member)
+# @name loginMemberSession
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "password": "password123"
+}
+
+### Capture Member Token
+@memberToken = {{loginMemberSession.response.body.data.tokens.accessToken}}
+
+### List Tasks as Member (Bob can only see tasks assigned to him)
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{memberToken}}
+
+### Get Single Task Details (Member Token)
+GET {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{memberToken}}
+
+### Update Task Status: TODO -> IN_PROGRESS (Member Token - Valid Transition)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "status": "IN_PROGRESS"
+}
+
+### Update Task Status: IN_PROGRESS -> BLOCKED (Member Token - Valid Transition)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "status": "BLOCKED"
+}
+
+### Update Task Status: BLOCKED -> IN_REVIEW (Member Token - Valid Transition)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "status": "IN_REVIEW"
+}
+
+### Update Task Status: IN_REVIEW -> DONE (Member Token - Valid Transition)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "status": "DONE"
+}
+
+### Update Task Status: Attempt Invalid Transition (e.g. DONE -> TODO, should fail)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{memberToken}}
+Content-Type: application/json
+
+{
+  "status": "TODO"
+}
+
+### Update Task Details (Manager Token)
+PATCH {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{managerToken}}
+Content-Type: application/json
+
+{
+  "title": "Setup Express Server (Completed)",
+  "priority": "MEDIUM"
+}
+
+### Delete Task (Manager Token - UNCOMMENT TO TEST)
+# DELETE {{baseUrl}}/tasks/{{taskId}}
+# Authorization: Bearer {{managerToken}}
+
+
+# ==========================================
+# 5. LOGOUT
+# ==========================================
+
+### Logout Admin (Invalidates Admin refresh token)
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
