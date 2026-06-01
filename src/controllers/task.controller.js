@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Task from "../models/Task.model.js";
 import User from "../models/User.model.js";
 import Project from "../models/Project.model.js";
@@ -88,6 +89,30 @@ export const createTask = async (req, res, next) => {
 export const getTasks = async (req, res, next) => {
     try {
         const { page = 1, limit = 10, status, priority, assignee } = req.query;
+
+        // Validate query parameters
+        if (page) {
+            const pageNum = Number(page);
+            if (!Number.isInteger(pageNum) || pageNum < 1) {
+                return next(new AppError(400, "VALIDATION_ERROR", "page must be a positive integer"));
+            }
+        }
+        if (limit) {
+            const limitNum = Number(limit);
+            if (!Number.isInteger(limitNum) || limitNum < 1) {
+                return next(new AppError(400, "VALIDATION_ERROR", "limit must be a positive integer"));
+            }
+        }
+        if (status && !["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED"].includes(status)) {
+            return next(new AppError(400, "VALIDATION_ERROR", "status filter must be one of TODO, IN_PROGRESS, IN_REVIEW, DONE, BLOCKED"));
+        }
+        if (priority && !["LOW", "MEDIUM", "HIGH"].includes(priority)) {
+            return next(new AppError(400, "VALIDATION_ERROR", "priority filter must be one of LOW, MEDIUM, HIGH"));
+        }
+        if (assignee && !mongoose.Types.ObjectId.isValid(assignee)) {
+            return next(new AppError(400, "VALIDATION_ERROR", "assignee filter must be a valid ObjectId"));
+        }
+
         const orgId = req.user.organizationId;
 
         // Base filter injected by scopeTaskQueries middleware
@@ -96,7 +121,7 @@ export const getTasks = async (req, res, next) => {
         // Apply route query filters
         if (status) filter.status = status;
         if (priority) filter.priority = priority;
-        
+
         // If query requests a specific assignee, check permission
         if (assignee) {
             if (req.user.role === "MEMBER" && req.user._id.toString() !== assignee.toString()) {

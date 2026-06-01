@@ -81,4 +81,52 @@ async function testCrypto() {
     }
 }
 
-testCrypto();
+testCrypto().then(() => {
+    // 4. Query Parameter Validation Logic Test
+    console.log("\n--- 4. Testing Query Parameter Validation Logic ---");
+    const validateQueries = (query) => {
+        const { page, limit, status, priority, assignee } = query;
+        const errors = [];
+        if (page) {
+            const pageNum = Number(page);
+            if (!Number.isInteger(pageNum) || pageNum < 1) {
+                errors.push("page must be a positive integer");
+            }
+        }
+        if (limit) {
+            const limitNum = Number(limit);
+            if (!Number.isInteger(limitNum) || limitNum < 1) {
+                errors.push("limit must be a positive integer");
+            }
+        }
+        if (status && !["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED"].includes(status)) {
+            errors.push("status filter must be one of TODO, IN_PROGRESS, IN_REVIEW, DONE, BLOCKED");
+        }
+        if (priority && !["LOW", "MEDIUM", "HIGH"].includes(priority)) {
+            errors.push("priority filter must be one of LOW, MEDIUM, HIGH");
+        }
+        // Simple ObjectId format validator
+        const isValidObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+        if (assignee && !isValidObjectId(assignee)) {
+            errors.push("assignee filter must be a valid ObjectId");
+        }
+        return errors;
+    };
+
+    const queryTests = [
+        { query: { page: "2", limit: "5" }, expectedErrors: 0 },
+        { query: { page: "abc", limit: "-1" }, expectedErrors: 2 },
+        { query: { status: "INVALID", priority: "VERY_HIGH" }, expectedErrors: 2 },
+        { query: { assignee: "123" }, expectedErrors: 1 },
+        { query: { assignee: "507f1f77bcf86cd799439011" }, expectedErrors: 0 }
+    ];
+
+    queryTests.forEach((t, i) => {
+        const errors = validateQueries(t.query);
+        console.log(`Query Test ${i + 1}: Found ${errors.length} errors, Expected = ${t.expectedErrors} -> ${errors.length === t.expectedErrors ? "PASS" : "FAIL"}`);
+        if (errors.length > 0) {
+            console.log(`  Errors: [ ${errors.join(", ")} ]`);
+        }
+    });
+});
+

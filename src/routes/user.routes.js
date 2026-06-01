@@ -9,7 +9,7 @@ const router = Router();
 router.post("/", authenticate, authorizeRoles("ADMIN"), createUser);
 router.get("/", authenticate, getUsers);
 router.get("/:id", authenticate, getUserById);
-router.patch("/:id", authenticate, authorizeRoles("ADMIN", "MANAGER"), updateUser);
+router.patch("/:id", authenticate, authorizeRoles("ADMIN"), updateUser);
 router.delete("/:id", authenticate, authorizeRoles("ADMIN"), deleteUser);
 
 export default router;
